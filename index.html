@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+
+  <title>Server-Timing Chart</title>
+  
+  <!-- Load Chart.js from a CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+      max-width: 800px;
+    }
+    form {
+      margin-bottom: 20px;
+    }
+    label, input {
+      display: block;
+      margin-bottom: 10px;
+    }
+    canvas {
+      max-width: 100%;
+      height: auto;
+    }
+  </style>
+</head>
+<body>
+  <h1>Server-Timing Header Visualization</h1>
+  
+  <form id="timingForm">
+    <label for="timingInput">Paste your Server-Timing header here:</label>
+    <input
+      type="text"
+      id="timingInput"
+      name="timingInput"
+      size="100"
+      placeholder='e.g. app;dur=341, db0;desc="Permission.findMany";dur=13, ...'
+      required
+    />
+    <button type="submit">Generate Chart</button>
+  </form>
+  
+  <h2>Chart</h2>
+  <p>This chart will display the durations of the metrics defined in the Server-Timing header.</p>
+  <canvas id="timing-chart"></canvas>
+
+  <script>
+    // When the form is submitted, parse the input and create/update the chart.
+    document.getElementById('timingForm').addEventListener('submit', function(event) {
+      event.preventDefault();
+      const input = document.getElementById('timingInput').value.trim();
+      if (!input) return;
+
+      // Parse the Server-Timing header. The format is generally:
+      // <metricName>[;desc="<description>"][;dur=<duration>], ...
+      // Example segment: db0;desc="Permission.findMany";dur=13
+      const segments = input.split(',').map(s => s.trim());
+      
+      const metrics = segments.map(segment => {
+        const parts = segment.split(';').map(p => p.trim());
+        
+        // The first part should be the metric name (e.g. "db0" or "app").
+        const metricName = parts[0] || '';
+        
+        // For description and duration, we look at subsequent parts.
+        let description = metricName;
+        let duration = 0;
+
+        parts.slice(1).forEach(p => {
+          if (p.startsWith('desc=')) {
+            // desc="Some description"
+            description = p.replace(/^desc="?|"?$/g, '').replace(/^desc=/, '');
+          } else if (p.startsWith('dur=')) {
+            // dur=XXX
+            duration = parseFloat(p.replace('dur=', ''));
+          }
+        });
+
+        return {
+          name: metricName,
+          description: description,
+          duration: duration
+        };
+      });
+
+      // Prepare data for chart
+      const labels = metrics.map(m => m.description || m.name);
+      const data = metrics.map(m => m.duration);
+      
+      // If a chart already exists, destroy it before creating a new one.
+      if (window.timingChart) {
+        window.timingChart.destroy();
+      }
+
+      const ctx = document.getElementById('timing-chart').getContext('2d');
+      console.log(data)
+      window.timingChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: 'Duration (ms)',
+            data: data,
+            backgroundColor: 'rgba(54, 162, 235, 0.6)',
+            borderColor: 'rgba(54, 162, 235, 1)',
+            borderWidth: 1
+          }]
+        }
+      });
+    });
+  </script>
+</body>
+</html>
